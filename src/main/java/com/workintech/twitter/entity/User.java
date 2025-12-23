@@ -50,7 +50,6 @@ public class User implements UserDetails {
     @Builder.Default
     private List<Tweet> tweets = new ArrayList<>();
 
-    // SQL şemana göre tekil role kolonu (Veya Role tablosu varsa ManyToOne)
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     @Builder.Default
