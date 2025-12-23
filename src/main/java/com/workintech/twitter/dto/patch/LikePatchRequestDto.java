@@ -3,6 +3,7 @@ package com.workintech.twitter.dto.patch;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 public record LikePatchRequestDto(
         @JsonProperty("tweet_id")
@@ -13,6 +14,6 @@ public record LikePatchRequestDto(
 
 
         @JsonProperty("created_at")
-        LocalDateTime createdAt
+        OffsetDateTime createdAt
 ) {
 }

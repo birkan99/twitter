@@ -7,6 +7,8 @@ import com.workintech.twitter.dto.response.UserResponseDto;
 import com.workintech.twitter.entity.Comment;
 import com.workintech.twitter.entity.Tweet;
 import com.workintech.twitter.entity.User;
+import com.workintech.twitter.exceptions.ForbiddenException;
+import com.workintech.twitter.exceptions.NotFoundException;
 import com.workintech.twitter.repository.CommentRepository;
 import com.workintech.twitter.repository.TweetRepository;
 import com.workintech.twitter.repository.UserRepository;
@@ -88,13 +90,30 @@ public class CommentServiceImpl implements CommentService {
 
         return mapToResponse(commentRepository.save(comment));
     }
-
+/*
     @Override
     public void deleteById(Long id) {
         if (!commentRepository.existsById(id)) {
             throw new RuntimeException("Comment not found");
         }
         commentRepository.deleteById(id);
+    }
+
+ */
+
+    @Override
+    public void deleteById(Long id) {
+        Comment comment = commentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Yorum bulunamadı"));
+
+        UserResponseDto loggedInUser = userService.getLoggedInUserDto();
+
+        // Güvenlik: Sadece yorum sahibi veya (opsiyonel) tweet sahibi silebilir
+        if (!comment.getUser().getId().equals(loggedInUser.id())) {
+            throw new ForbiddenException("Bu yorumu silme yetkiniz yok!");
+        }
+
+        commentRepository.delete(comment);
     }
 
     private CommentResponseDto mapToResponse(Comment c) {

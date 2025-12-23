@@ -12,14 +12,20 @@ import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/tweet")
 @RequiredArgsConstructor
 @Validated
 public class TweetController {
 
-    @Autowired
     private final TweetService tweetService;
+
+    @GetMapping
+    public List<TweetResponseDto> findAll() {
+        return tweetService.getAll();
+    }
 
     @GetMapping("/{id}")
     public TweetResponseDto findById(@Positive @PathVariable Long id) {

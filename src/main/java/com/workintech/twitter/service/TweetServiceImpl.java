@@ -50,7 +50,7 @@ public class TweetServiceImpl implements TweetService {
 
         Tweet tweet = Tweet.builder()
                 .content(dto.content())
-                .user(userRef) // Entity sızdırmadan ID bağladık
+                .user(userRef)
                 .createdAt(OffsetDateTime.now())
                 .build();
 

@@ -7,6 +7,9 @@ import com.workintech.twitter.dto.response.UserResponseDto;
 import com.workintech.twitter.entity.Like;
 import com.workintech.twitter.entity.Tweet;
 import com.workintech.twitter.entity.User;
+import com.workintech.twitter.exceptions.ConflictException;
+import com.workintech.twitter.exceptions.ForbiddenException;
+import com.workintech.twitter.exceptions.NotFoundException;
 import com.workintech.twitter.repository.LikeRepository;
 import com.workintech.twitter.repository.TweetRepository;
 import com.workintech.twitter.repository.UserRepository; // Eklendi
@@ -40,18 +43,17 @@ public class LikeServiceImpl implements LikeService {
     @Override
     @Transactional
     public LikeResponseDto create(LikeRequestDto dto) {
-        // 1. Dış dünyadan sadece DTO alıyoruz
         UserResponseDto loggedInUser = userService.getLoggedInUserDto();
 
-        // 2. Entity referanslarını alıyoruz (Veritabanına SELECT atmaz, sadece ID'yi bağlar)
-        User userRef = userRepository.getReferenceById(loggedInUser.id());
-        Tweet tweetRef = tweetRepository.getReferenceById(dto.tweetId());
+        // MANTIK: Aynı kullanıcı aynı tweeti tekrar beğenemez
+        if(likeRepository.existsByTweetIdAndUserId(dto.tweetId(), loggedInUser.id())) {
+            throw new ConflictException("Bu tweeti zaten beğendiniz.");
+        }
 
-        Like like = Like.builder()
-                .tweet(tweetRef)
-                .user(userRef)
-                .createdAt(OffsetDateTime.now())
-                .build();
+        Like like = new Like();
+        like.setTweet(tweetRepository.getReferenceById(dto.tweetId()));
+        like.setUser(userRepository.getReferenceById(loggedInUser.id()));
+        like.setCreatedAt(OffsetDateTime.now());
 
         return mapToResponse(likeRepository.save(like));
     }
@@ -76,18 +78,21 @@ public class LikeServiceImpl implements LikeService {
     @Override
     @Transactional
     public LikeResponseDto update(Long id, LikePatchRequestDto dto) {
-        // Like genelde güncellenen bir şey değildir (ya vardır ya yoktur)
-        // Ancak metodunuzun çalışması için mevcut Like'ı bulup kaydetmeniz yeterli
         Like like = likeRepository.findById(id).orElseThrow(() -> new RuntimeException("Like not found"));
         return mapToResponse(likeRepository.save(like));
     }
 
     @Override
     public void deleteById(Long id) {
-        if (!likeRepository.existsById(id)) {
-            throw new RuntimeException("Like not found");
+        Like like = likeRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Beğeni bulunamadı"));
+
+        UserResponseDto loggedInUser = userService.getLoggedInUserDto();
+        // GÜVENLİK: Başkasının beğenisini kaldıramazsınız
+        if(!like.getUser().getId().equals(loggedInUser.id())) {
+            throw new ForbiddenException("Bu işlemi yapma yetkiniz yok.");
         }
-        likeRepository.deleteById(id);
+        likeRepository.delete(like);
     }
 
     private LikeResponseDto mapToResponse(Like l) {

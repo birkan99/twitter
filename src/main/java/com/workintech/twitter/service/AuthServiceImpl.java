@@ -7,6 +7,8 @@ import com.workintech.twitter.dto.response.RegisterResponseDto;
 import com.workintech.twitter.dto.response.UserResponseDto;
 import com.workintech.twitter.entity.Role;
 import com.workintech.twitter.entity.User;
+import com.workintech.twitter.exceptions.UserAlreadyExistException;
+import com.workintech.twitter.exceptions.UserNotFoundException;
 import com.workintech.twitter.repository.UserRepository;
 import com.workintech.twitter.security.JwtService;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +33,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public RegisterResponseDto register(RegisterRequestDto dto) {
         if (userRepository.findByEmail(dto.email()).isPresent()) {
-            throw new RuntimeException("Hata: Bu email adresi zaten kayıtlı!");
+            throw new UserAlreadyExistException("Hata: Bu email adresi zaten kayıtlı!");
         }
 
         User user = User.builder()
@@ -46,32 +48,6 @@ public class AuthServiceImpl implements AuthService {
 
         return new RegisterResponseDto(user.getEmail(), "Kullanıcı kaydı başarıyla oluşturuldu.");
     }
-/*
-    @Override
-    public AuthResponseDto login(LoginRequestDto dto) {
-        // AuthenticationManager şifreyi otomatik kontrol eder
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(dto.email(), dto.password())
-        );
-
-        User user = userRepository.findByEmail(dto.email())
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
-
-        String jwtToken = jwtService.generateToken(String.valueOf(user));
-
-// AuthServiceImpl içindeki login metodunun ilgili kısmı:
-
-        UserResponseDto userResponse = new UserResponseDto(
-                user.getId(),
-                user.getEmail(),
-                user.getDisplayName(),
-                user.getCreatedAt()
-        );
-
-        return new AuthResponseDto(jwtToken, userResponse);
-    }
-
- */
 
     @Override
     public AuthResponseDto login(LoginRequestDto dto) {
@@ -82,9 +58,8 @@ public class AuthServiceImpl implements AuthService {
 
         // 2. Kullanıcıyı bul
         User user = userRepository.findByEmail(dto.email())
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
+                .orElseThrow(() -> new UserNotFoundException("Kullanıcı bulunamadı"));
 
-        // 3. Token Üret (Burada JwtService kullandığından emin ol, JwtUtil değil)
         String jwtToken = jwtService.generateToken(user.getEmail());
 
         // 4. Response hazırlama
