@@ -3,12 +3,15 @@ package com.workintech.twitter.service;
 import com.workintech.twitter.dto.patch.TweetPatchRequestDto;
 import com.workintech.twitter.dto.request.TweetRequestDto;
 import com.workintech.twitter.dto.response.TweetResponseDto;
-import com.workintech.twitter.dto.response.UserResponseDto;
 import com.workintech.twitter.entity.Tweet;
 import com.workintech.twitter.entity.User;
+import com.workintech.twitter.exceptions.NotFoundException;
+import com.workintech.twitter.exceptions.UserNotFoundException;
 import com.workintech.twitter.repository.TweetRepository;
-import com.workintech.twitter.repository.UserRepository; // Referans için eklendi
+import com.workintech.twitter.repository.UserRepository;
+import com.workintech.twitter.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,8 +22,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TweetServiceImpl implements TweetService {
     private final TweetRepository tweetRepository;
-    private final UserRepository userRepository; // ID üzerinden referans bağlamak için
-    private final UserService userService;
+    private final UserRepository userRepository;
 
     @Override
     public List<TweetResponseDto> getAll() {
@@ -42,15 +44,24 @@ public class TweetServiceImpl implements TweetService {
     @Override
     @Transactional
     public TweetResponseDto create(TweetRequestDto dto) {
-        // 1. Giriş yapan kullanıcının DTO'sunu alıyoruz
-        UserResponseDto loggedInUser = userService.getLoggedInUserDto();
+        // 1. JWT ile gelen kullanıcıyı SecurityContext'ten güvenli bir şekilde al
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        // 2. Sadece ID'yi kullanarak referans (proxy) oluşturuyoruz
-        User userRef = userRepository.getReferenceById(loggedInUser.id());
+        String email;
+        if (principal instanceof CustomUserDetails) {
+            email = ((CustomUserDetails) principal).getUsername();
+        } else {
+            email = principal.toString();
+        }
 
+        // 2. Email ile gerçek kullanıcıyı veritabanından getir
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("Oturum açan kullanıcı bulunamadı!"));
+
+        // 3. Tweet'i bu gerçek kullanıcıyla ilişkilendir
         Tweet tweet = Tweet.builder()
                 .content(dto.content())
-                .user(userRef)
+                .user(user)
                 .createdAt(OffsetDateTime.now())
                 .build();
 
@@ -59,33 +70,17 @@ public class TweetServiceImpl implements TweetService {
 
     @Override
     @Transactional
-    public TweetResponseDto replaceOrCreate(Long id, TweetRequestDto dto) {
-        UserResponseDto loggedInUser = userService.getLoggedInUserDto();
-
-        Tweet tweet = tweetRepository.findById(id).orElse(new Tweet());
-        tweet.setId(id);
-        tweet.setContent(dto.content());
-        tweet.setUser(userRepository.getReferenceById(loggedInUser.id()));
-
-        if(tweet.getCreatedAt() == null) tweet.setCreatedAt(OffsetDateTime.now());
-
-        return mapToResponse(tweetRepository.save(tweet));
-    }
-
-    @Override
-    @Transactional
     public TweetResponseDto update(Long id, TweetPatchRequestDto dto) {
         Tweet tweet = tweetRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Tweet bulunamadı"));
+                .orElseThrow(() -> new NotFoundException("Tweet bulunamadı"));
 
-        // GÜVENLİK KONTROLÜ: DTO'dan gelen ID ile tweet sahibinin ID'sini karşılaştırıyoruz
-        UserResponseDto loggedInUser = userService.getLoggedInUserDto();
-        if(!tweet.getUser().getId().equals(loggedInUser.id())) {
+        // GÜVENLİK: Sadece tweet sahibi güncelleyebilir
+        String currentEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        if (!tweet.getUser().getEmail().equals(currentEmail)) {
             throw new RuntimeException("Bu tweeti güncelleme yetkiniz yok!");
         }
 
-        if(dto.content() != null) tweet.setContent(dto.content());
-
+        if (dto.content() != null) tweet.setContent(dto.content());
         return mapToResponse(tweetRepository.save(tweet));
     }
 
@@ -93,15 +88,30 @@ public class TweetServiceImpl implements TweetService {
     @Transactional
     public void deleteById(Long id) {
         Tweet tweet = tweetRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Tweet bulunamadı"));
+                .orElseThrow(() -> new NotFoundException("Tweet bulunamadı"));
 
-        // GÜVENLİK KONTROLÜ
-        UserResponseDto loggedInUser = userService.getLoggedInUserDto();
-        if(!tweet.getUser().getId().equals(loggedInUser.id())) {
+        // GÜVENLİK: Sadece tweet sahibi silebilir
+        String currentEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        if (!tweet.getUser().getEmail().equals(currentEmail)) {
             throw new RuntimeException("Bu tweeti silme yetkiniz yok!");
         }
 
         tweetRepository.delete(tweet);
+    }
+
+    @Override
+    @Transactional
+    public TweetResponseDto replaceOrCreate(Long id, TweetRequestDto dto) {
+        String currentEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(currentEmail).orElseThrow();
+
+        Tweet tweet = tweetRepository.findById(id).orElse(new Tweet());
+        tweet.setId(id);
+        tweet.setContent(dto.content());
+        tweet.setUser(user);
+        if (tweet.getCreatedAt() == null) tweet.setCreatedAt(OffsetDateTime.now());
+
+        return mapToResponse(tweetRepository.save(tweet));
     }
 
     private TweetResponseDto mapToResponse(Tweet tweet) {

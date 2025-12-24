@@ -58,4 +58,8 @@ public class TweetController {
 
         tweetService.deleteById(id);
     }
+    @GetMapping("/findByUserId")
+    public List<TweetResponseDto> findByUserId(@RequestParam("userId") Long userId) {
+        return tweetService.findAllByUserId(userId);
+    }
 }
