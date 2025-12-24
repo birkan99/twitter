@@ -31,9 +31,9 @@ public class Tweet {
     private OffsetDateTime createdAt;
 
     @NotNull
-    @ManyToOne(fetch = FetchType.EAGER) // Tweet çekildiğinde kullanıcı bilgisi gelmeli
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false)
-    @JsonIgnoreProperties({"tweets", "password", "authorities", "enabled"}) // Döngü ve sızıntı engeli
+    @JsonIgnoreProperties({"tweets", "password", "authorities", "enabled"})
     private User user;
 
     @Builder.Default
