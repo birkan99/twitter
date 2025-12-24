@@ -12,7 +12,7 @@ import com.workintech.twitter.exceptions.ForbiddenException;
 import com.workintech.twitter.exceptions.NotFoundException;
 import com.workintech.twitter.repository.LikeRepository;
 import com.workintech.twitter.repository.TweetRepository;
-import com.workintech.twitter.repository.UserRepository; // Eklendi
+import com.workintech.twitter.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,7 +25,7 @@ import java.util.List;
 public class LikeServiceImpl implements LikeService {
     private final LikeRepository likeRepository;
     private final TweetRepository tweetRepository;
-    private final UserRepository userRepository; // ID üzerinden referans almak için eklendi
+    private final UserRepository userRepository;
     private final UserService userService;
 
     @Override
@@ -37,7 +37,7 @@ public class LikeServiceImpl implements LikeService {
     public LikeResponseDto findById(Long id) {
         return likeRepository.findById(id)
                 .map(this::mapToResponse)
-                .orElseThrow(() -> new RuntimeException("Like not found: " + id));
+                .orElseThrow(() -> new NotFoundException(id + " ID'li beğeni kaydı bulunamadı."));
     }
 
     @Override
@@ -96,6 +96,8 @@ public class LikeServiceImpl implements LikeService {
     }
 
     private LikeResponseDto mapToResponse(Like l) {
+        if (l == null) return null;
+
         return new LikeResponseDto(
                 l.getId(),
                 l.getTweet() != null ? l.getTweet().getId() : null,

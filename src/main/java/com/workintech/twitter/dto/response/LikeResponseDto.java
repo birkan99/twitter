@@ -3,6 +3,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 public record LikeResponseDto(
         @JsonProperty("id") Long id,
-        @JsonProperty("tweetId") Long tweetId,
-        @JsonProperty("userId") Long userId
+        @JsonProperty("tweet_id") Long tweetId,
+        @JsonProperty("user_id") Long userId
 ) {}
